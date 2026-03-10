@@ -1,0 +1,261 @@
+// ARKA MMS - Maintenance Monitoring System
+// Sumber desain: docs/maintenance-monitoring-system.md §5
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+}
+
+// ---------------------------------------------------------------------------
+// Enums
+// ---------------------------------------------------------------------------
+
+enum AttachmentEntityType {
+  MAINTENANCE_PLAN
+  MAINTENANCE_ACTUAL
+}
+
+// ---------------------------------------------------------------------------
+// 5.1 Unit (cache dari API eksternal)
+// ---------------------------------------------------------------------------
+
+model Unit {
+  id           String    @id
+  code         String
+  model        String?
+  description  String?   @db.VarChar(255)
+  projectId    String?   @map("project_id")
+  projectName  String?   @map("project_name")
+  manufacture  String?   @map("manufacture")
+  plantGroup   String?   @map("plant_group")
+  plantType    String?   @map("plant_type")
+  unitStatus   String?   @map("unit_status")
+  lastSyncAt   DateTime? @map("last_sync_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  maintenanceActuals MaintenanceActual[]
+
+  @@map("units")
+}
+
+// ---------------------------------------------------------------------------
+// 5.2 Maintenance Type
+// ---------------------------------------------------------------------------
+
+model MaintenanceType {
+  id        String   @id @default(cuid())
+  name      String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  maintenancePlans   MaintenancePlan[]
+  monthlyReportItems MonthlyReportItem[]
+  yearlyReportItems  YearlyReportItem[]
+
+  @@map("maintenance_types")
+}
+
+// ---------------------------------------------------------------------------
+// 5.3 User
+// ---------------------------------------------------------------------------
+
+model User {
+  id           String   @id @default(cuid())
+  username     String   @unique
+  name         String?
+  email        String?
+  passwordHash String   @map("password_hash")
+  projectScope String?  @map("project_scope")
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  userRoles    UserRole[]
+
+  maintenancePlansCreated    MaintenancePlan[]    @relation("PlanCreatedBy")
+  maintenanceActualsCreated  MaintenanceActual[]  @relation("ActualCreatedBy")
+  attachmentsUploaded        Attachment[]         @relation("AttachmentUploadedBy")
+
+  @@map("users")
+}
+
+// ---------------------------------------------------------------------------
+// Role & Permission (Spatie-like: roles + permissions di DB)
+// ---------------------------------------------------------------------------
+
+model Permission {
+  id        String   @id @default(cuid())
+  name      String   @unique  // e.g. "plan.create", "user.manage"
+  createdAt DateTime @default(now()) @map("created_at")
+
+  roles RolePermission[]
+
+  @@map("permissions")
+}
+
+/// Role table; assign ke user via user_roles (user_roles.role_id)
+model AuthRole {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  createdAt DateTime @default(now()) @map("created_at")
+
+  permissions RolePermission[]
+  users       UserRole[]
+
+  @@map("roles")
+}
+
+model RolePermission {
+  roleId       String @map("role_id")
+  permissionId String @map("permission_id")
+
+  role       AuthRole    @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+model UserRole {
+  userId String @map("user_id")
+  roleId String @map("role_id")
+
+  user User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role AuthRole @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+  @@map("user_roles")
+}
+
+// ---------------------------------------------------------------------------
+// 5.4 Maintenance Plan (agregat per project, periode bulanan, tipe maintenance)
+// ---------------------------------------------------------------------------
+
+model MaintenancePlan {
+  id                 String   @id @default(cuid())
+  projectId          String   @map("project_id")   // project identifier (selaras dengan Unit.projectId)
+  year               Int                            // tahun periode (e.g. 2025)
+  month              Int                            // bulan 1-12
+  maintenanceTypeId  String   @map("maintenance_type_id")
+  sumPlan            Int      @map("sum_plan")       // jumlah maintenance yang direncanakan
+  createdById        String   @map("created_by")
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  maintenanceType MaintenanceType  @relation(fields: [maintenanceTypeId], references: [id], onDelete: Restrict)
+  createdBy       User             @relation("PlanCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  actuals        MaintenanceActual[]
+
+  @@unique([projectId, year, month, maintenanceTypeId])
+  @@map("maintenance_plans")
+}
+
+// ---------------------------------------------------------------------------
+// 5.5 Maintenance Actual (realisasi per unit, terhubung ke plan; attachment via Attachment)
+// ---------------------------------------------------------------------------
+
+model MaintenanceActual {
+  id                 String    @id @default(cuid())
+  maintenancePlanId  String    @map("maintenance_plan_id")
+  unitId             String    @map("unit_id")
+  maintenanceDate    DateTime  @map("maintenance_date")
+  maintenanceTime    String?   @map("maintenance_time")   // HH:mm
+  hourMeter          Int      @map("hour_meter")
+  remarks            String?   @db.Text
+  mechanics          String?   @db.Text                  // mekanik diketik manual, bisa beberapa (e.g. "Budi, Andi, Citra")
+  createdById        String    @map("created_by")
+  createdAt          DateTime  @default(now()) @map("created_at")
+
+  maintenancePlan MaintenancePlan @relation(fields: [maintenancePlanId], references: [id], onDelete: Restrict)
+  unit            Unit            @relation(fields: [unitId], references: [id], onDelete: Restrict)
+  createdBy       User            @relation("ActualCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+
+  @@map("maintenance_actuals")
+}
+
+// ---------------------------------------------------------------------------
+// 5.6 Attachment (dokumen maintenance actual; entityType + entityId = MAINTENANCE_ACTUAL, id)
+// ---------------------------------------------------------------------------
+
+model Attachment {
+  id          String                @id @default(cuid())
+  entityType  AttachmentEntityType   @map("entity_type")
+  entityId    String                @map("entity_id")
+  fileName    String                @map("file_name")
+  fileType    String?               @map("file_type")
+  fileSize    Int?                  @map("file_size")
+  storagePath String                @map("storage_path")
+  uploadedById String               @map("uploaded_by")
+  uploadedAt  DateTime              @default(now()) @map("uploaded_at")
+
+  uploadedBy User @relation("AttachmentUploadedBy", fields: [uploadedById], references: [id], onDelete: Restrict)
+
+  @@map("attachments")
+}
+
+// ---------------------------------------------------------------------------
+// 5.8 Monthly Report (Snapshot)
+// ---------------------------------------------------------------------------
+
+model MonthlyReport {
+  id          String   @id @default(cuid())
+  year        Int
+  month       Int
+  generatedAt DateTime @default(now()) @map("generated_at")
+
+  items MonthlyReportItem[]
+
+  @@unique([year, month])
+  @@map("monthly_reports")
+}
+
+model MonthlyReportItem {
+  id                  String   @id @default(cuid())
+  reportId            String   @map("report_id")
+  unitId              String   @map("unit_id")
+  maintenanceTypeId   String   @map("maintenance_type_id")
+  projectSnapshot    String?  @map("project_snapshot")
+  totalPlan          Int      @map("total_plan")
+  totalActual        Int      @map("total_actual")
+  complianceRate     Float?   @map("compliance_rate")
+  lastHourMeter      Int?     @map("last_hour_meter")
+
+  report MonthlyReport       @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  maintenanceType MaintenanceType @relation(fields: [maintenanceTypeId], references: [id], onDelete: Restrict)
+
+  @@map("monthly_report_items")
+}
+
+// ---------------------------------------------------------------------------
+// 5.9 Yearly Report (Snapshot)
+// ---------------------------------------------------------------------------
+
+model YearlyReport {
+  id          String   @id @default(cuid())
+  year        Int
+  generatedAt DateTime @default(now()) @map("generated_at")
+
+  items YearlyReportItem[]
+
+  @@unique([year])
+  @@map("yearly_reports")
+}
+
+model YearlyReportItem {
+  id                  String   @id @default(cuid())
+  reportId            String   @map("report_id")
+  unitId              String   @map("unit_id")
+  maintenanceTypeId   String   @map("maintenance_type_id")
+  projectSnapshot    String?  @map("project_snapshot")
+  totalPlan          Int      @map("total_plan")
+  totalActual        Int      @map("total_actual")
+  complianceRate     Float?   @map("compliance_rate")
+
+  report          YearlyReport       @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  maintenanceType MaintenanceType    @relation(fields: [maintenanceTypeId], references: [id], onDelete: Restrict)
+
+  @@map("yearly_report_items")
+}
