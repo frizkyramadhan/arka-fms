@@ -18,14 +18,7 @@ const AuthGuard = props => {
       const hasStoredUser =
         window.localStorage.getItem('userData') || window.sessionStorage.getItem('userData')
       if (auth.user === null && !hasStoredUser) {
-        if (router.asPath !== '/' && !router.pathname.includes('login')) {
-          router.replace({
-            pathname: '/login',
-            query: { returnUrl: router.asPath }
-          })
-        } else {
-          router.replace('/login')
-        }
+        router.replace('/login')
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps

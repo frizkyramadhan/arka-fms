@@ -1,9 +1,8 @@
 /**
  * GuestGuard — halaman tamu (mis. login).
- * Hanya redirect ke home jika user sudah terverifikasi (auth.user dari me()), bukan sekadar userData di storage.
- * Mencegah redirect loop saat session habis tapi Remember Me meninggalkan userData di localStorage.
+ * Redirect ke dashboard maintenance jika user sudah terverifikasi (auth.user dari me()).
  */
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 
 // ** Next Import
 import { useRouter } from 'next/router'
@@ -11,17 +10,19 @@ import { useRouter } from 'next/router'
 // ** Hooks Import
 import { useAuth } from 'src/hooks/useAuth'
 
+const AFTER_LOGIN_REDIRECT = '/dashboards/maintenance'
+
 const GuestGuard = props => {
   const { children, fallback } = props
   const auth = useAuth()
   const router = useRouter()
+  const hasRedirected = useRef(false)
 
   useEffect(() => {
     if (!router.isReady || auth.loading) return
-    if (auth.user) {
-      const returnUrl = router.query.returnUrl
-      const path = returnUrl && returnUrl !== '/' ? returnUrl : '/'
-      router.replace(path)
+    if (auth.user && !hasRedirected.current) {
+      hasRedirected.current = true
+      router.replace(AFTER_LOGIN_REDIRECT)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router.isReady, router.route, auth.loading, auth.user])

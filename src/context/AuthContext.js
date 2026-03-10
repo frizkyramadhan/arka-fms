@@ -78,9 +78,7 @@ const AuthProvider = ({ children }) => {
           window.sessionStorage.setItem('userData', JSON.stringify(userData))
         }
         setUser({ ...userData })
-        const returnUrl = router.query.returnUrl
-        const redirectURL = returnUrl && returnUrl !== '/' ? returnUrl : '/'
-        router.replace(redirectURL)
+        // Redirect hanya di GuestGuard (satu tempat) untuk hindari double navigation & abort fetch "/"
       })
       .catch(err => {
         if (errorCallback) errorCallback(err)

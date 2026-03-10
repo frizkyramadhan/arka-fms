@@ -27,10 +27,7 @@ export async function middleware(request) {
   const payload = await verifyToken(token)
 
   if (!payload) {
-    const loginUrl = new URL('/login', request.url)
-    loginUrl.searchParams.set('returnUrl', pathname)
-    
-return NextResponse.redirect(loginUrl)
+    return NextResponse.redirect(new URL('/login', request.url))
   }
 
   return NextResponse.next()
