@@ -1,6 +1,7 @@
 /**
  * GuestGuard — halaman tamu (mis. login).
  * Redirect ke dashboard maintenance jika user sudah terverifikasi (auth.user dari me()).
+ * Pakai window.location agar full page load dan tidak trigger "Abort fetching component for route: '/'" dari Next router.
  */
 import { useEffect, useRef } from 'react'
 
@@ -22,7 +23,7 @@ const GuestGuard = props => {
     if (!router.isReady || auth.loading) return
     if (auth.user && !hasRedirected.current) {
       hasRedirected.current = true
-      router.replace(AFTER_LOGIN_REDIRECT)
+      window.location.replace(AFTER_LOGIN_REDIRECT)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router.isReady, router.route, auth.loading, auth.user])
