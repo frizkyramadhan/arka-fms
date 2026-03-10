@@ -78,6 +78,7 @@ const AuthProvider = ({ children }) => {
           window.sessionStorage.setItem('userData', JSON.stringify(userData))
         }
         setUser({ ...userData })
+
         // Redirect hanya di GuestGuard (satu tempat) untuk hindari double navigation & abort fetch "/"
       })
       .catch(err => {
