@@ -32,7 +32,6 @@ CREATE TABLE `users` (
     `name` VARCHAR(191) NULL,
     `email` VARCHAR(191) NULL,
     `password_hash` VARCHAR(191) NOT NULL,
-    `role` ENUM('ADMIN_HO', 'ADMIN_SITE', 'MECHANIC') NOT NULL,
     `project_scope` VARCHAR(191) NULL,
     `is_active` BOOLEAN NOT NULL DEFAULT true,
     `created_at` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
