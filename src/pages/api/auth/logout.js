@@ -1,18 +1,18 @@
 /**
  * POST /api/auth/logout
- * Menghapus cookie accessToken (untuk middleware RBAC).
- * Client tetap membersihkan localStorage/sessionStorage di AuthContext.
+ * Menghapus cookie HttpOnly accessToken (middleware RBAC membaca cookie ini).
+ * Client tetap membersihkan localStorage/sessionStorage di AuthContext.handleLogout.
  */
+import { clearAccessTokenCookie } from 'src/lib/auth-api'
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     res.setHeader('Allow', ['POST'])
-    
-return res.status(405).end()
+
+    return res.status(405).end()
   }
 
-  res.setHeader('Set-Cookie', [
-    'accessToken=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0'
-  ])
-  
-return res.status(200).json({ message: 'Logged out' })
+  clearAccessTokenCookie(res)
+
+  return res.status(200).json({ message: 'Logged out' })
 }

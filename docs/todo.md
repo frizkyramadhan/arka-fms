@@ -42,6 +42,10 @@ Include relevant context in brackets to help with future AI-assisted coding:
 
 - (Siap task berikutnya: MinIO attachments / Scheduler)
 
+## Recently Completed (API auth refactor)
+
+- `[done] P2: Refactor src/pages/api/auth/* — src/lib/auth-api.js (JWT, cookie, mapUserData, signAccessToken); logout clear cookie dengan Secure di prod; me parseBearer + cek decoded.id; register mapRegisteredUser + blank line ESLint]` (completed: 2026-03-11)
+
 ## Recently Completed (Nav & Pages cleanup)
 
 - `[done] P2: Hapus halaman selain Dashboard Maintenance, Plan, Actual, Type, Unit, User, Role, Permission; navigasi vertikal & horizontal hanya menu ARKA MMS; server-side menu (fake-db) dan app-bar search disesuaikan; UserDropdown hanya Dashboard + Sign Out; index redirect ke /dashboards/maintenance; getHomeRoute selalu ke maintenance]` (completed: 2026-03-09)

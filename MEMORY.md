@@ -4,6 +4,14 @@ Catatan penting, keputusan teknis, dan pembelajaran untuk proyek Maintenance Mon
 
 ---
 
+## 2026-03-11: Refactor API Auth — Satu Sumber JWT + Cookie + userData
+
+- **Konteks**: `login.js` dan `me.js` menduplikasi `JWT_SECRET`, `mapUserData`, dan logika cookie; `logout.js` clear cookie tanpa `Secure` di production sehingga bisa tidak terhapus konsisten dengan saat set.
+- **Perubahan**: `src/lib/auth-api.js` — `JWT_SECRET`, `parseBearerToken`, `mapUserData`, `signAccessToken`, `setAccessTokenCookie`, `clearAccessTokenCookie` (Path/HttpOnly/SameSite/Secure selaras). Handler `login` / `me` / `logout` / `register` memakai helper; `me` cek `decoded.id` eksplisit; error shape login tetap `{ error: { username: [] } }` untuk `login/index.js`.
+- **Insight**: Middleware (`jose`) dan API (`jsonwebtoken`) harus tetap pakai secret string yang sama — sekali definisi di `auth-api` untuk route auth; `permissions-server` tetap punya `JWT_SECRET` sendiri untuk hindari siklus import.
+
+---
+
 ## 2026-03-06: Role & Permission ala Spatie (Next.js + Prisma + CASL)
 
 - **Konteks**: Tidak ada package Next.js yang 1:1 seperti Spatie Laravel Permission; rekomendasi: schema Role/Permission di DB + CASL untuk ability.

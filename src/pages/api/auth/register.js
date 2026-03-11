@@ -1,14 +1,15 @@
 /**
  * POST /api/auth/register
- * Body: { username, email, password, name? }
- * Creates user + user_roles. Default role = role yang punya permission all.manage (tidak bergantung nama).
- * Returns: { message, user: { id, username, email, role, isActive } }
+ * Body: { username, email?, password, name? }
+ * Membuat user isActive: false; admin harus mengaktifkan. Default role via permission all.manage.
+ * Response 201: { message, user: { id, username, email, role, isActive } }
+ * Error 400/409: { error: { username?: string[], email?: string[] } }
  */
 import prisma from 'src/lib/prisma'
 import bcrypt from 'bcryptjs'
 import { getDefaultRoleIdByPermission } from 'src/lib/permissions-server'
 
-function mapUser(u, roleName = null) {
+function mapRegisteredUser(u, roleName = null) {
   return {
     id: u.id,
     username: u.username,
@@ -21,8 +22,8 @@ function mapUser(u, roleName = null) {
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     res.setHeader('Allow', ['POST'])
-    
-return res.status(405).end()
+
+    return res.status(405).end()
   }
 
   try {
@@ -69,22 +70,29 @@ return res.status(405).end()
         isActive: false
       }
     })
+
     const defaultRoleId = await getDefaultRoleIdByPermission('all.manage')
     let roleName = null
     if (defaultRoleId) {
-      await prisma.userRole.create({ data: { userId: user.id, roleId: defaultRoleId } })
-      const role = await prisma.authRole.findUnique({ where: { id: defaultRoleId } })
+      await prisma.userRole.create({
+        data: { userId: user.id, roleId: defaultRoleId }
+      })
+
+      const role = await prisma.authRole.findUnique({
+        where: { id: defaultRoleId }
+      })
       roleName = role?.name ?? null
     }
 
     return res.status(201).json({
-      message: 'Registration successful. Account is inactive until activated by admin.',
-      user: mapUser(user, roleName)
+      message:
+        'Registration successful. Account is inactive until activated by admin.',
+      user: mapRegisteredUser(user, roleName)
     })
   } catch (e) {
     console.error('POST /api/auth/register', e)
-    
-return res.status(500).json({
+
+    return res.status(500).json({
       error: { username: ['Something went wrong'] }
     })
   }
