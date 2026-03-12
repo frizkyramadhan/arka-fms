@@ -1,0 +1,32 @@
+# Cuplikan untuk service arka-fms — gabungkan ke docker-compose.yml kamu.
+# Context ./apps/arka-fms = folder yang berisi Dockerfile + source (sesuaikan path).
+#
+# DATABASE_URL: host = nama service mysql di compose, BUKAN localhost.
+# Password apppass@123 → dalam URL encode @ jadi %40 → apppass%40123
+#
+# Buat DB arka_mms di MySQL sekali (atau ganti nama DB di URL):
+#   docker exec -it <mysql-container> mysql -uroot -prootpass@123 -e "CREATE DATABASE IF NOT EXISTS arka_mms;"
+#   docker exec -it <mysql-container> mysql -uroot -prootpass@123 -e "GRANT ALL ON arka_mms.* TO 'appuser'@'%'; FLUSH PRIVILEGES;"
+
+services:
+  arka-fms:
+    build:
+      context: ./apps/arka-fms
+      args:
+        # WAJIB — sama dengan environment.JWT_SECRET di bawah
+        JWT_SECRET: ${JWT_SECRET}
+        JWT_COOKIE_SECURE: "false"
+    container_name: stack-arka-fms
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_COOKIE_SECURE: "false"
+      # Ganti user/pass/db sesuai compose mysql kamu; @ dalam password → %40
+      DATABASE_URL: mysql://appuser:apppass%40123@mysql:3306/arka_mms
+      # Kalau akses lewat nginx di host lain, sesuaikan (untuk link absolut opsional)
+      # NEXT_PUBLIC_APP_URL: http://saphireone.local:3000
+    depends_on:
+      - mysql
+    networks: [appnet]

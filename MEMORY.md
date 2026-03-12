@@ -4,6 +4,31 @@ Catatan penting, keputusan teknis, dan pembelajaran untuk proyek Maintenance Mon
 
 ---
 
+## 2026-03-12: Rotate JWT secrets — JWT_SECRET terpisah dari NEXT_PUBLIC_*
+
+- **Perubahan**: `.env` — `JWT_SECRET`, `NEXT_PUBLIC_JWT_SECRET`, dan `NEXT_PUBLIC_JWT_REFRESH_TOKEN_SECRET` diganti masing-masing dengan nilai random 32-byte (hex 64 char), semua **berbeda**. Server memakai hanya `JWT_SECRET` untuk sign/verify token nyata.
+- **Dampak**: Token/cookie lama **tidak valid** lagi — user harus **login ulang**. Docker/production harus pakai `.env` yang sama (sync env container).
+
+---
+
+## 2026-03-12: Dockerfile + compose — JWT_SECRET saat build & DATABASE_URL mysql
+
+- **Dockerfile**: `ARG JWT_SECRET` + `ENV` sebelum `npm run build`; build gagal jika kosong. `.dockerignore` mengecualikan `.env` agar secret tidak masuk layer image — wajib `build.args` / `--build-arg`.
+- **DATABASE_URL**: di container `localhost` = container sendiri; pakai host `mysql` (nama service). Password `apppass@123` → URL `apppass%40123`. Cuplikan compose: `docker-compose.snippet.yml`.
+
+---
+
+## 2026-03-12: Redirect loop — Middleware Edge vs JWT_SECRET saat build
+
+- **Gejala**: Setelah `JWT_COOKIE_SECURE=false` masih loop — login API 200 tapi akses `/dashboards/*` tetap redirect `/login`.
+- **Penyebab**: **Middleware** (`src/middleware.js`) jalan di **Edge**; `JWT_SECRET` di sana sering **ter-inline saat `next build`**. Kalau image Docker di-build **tanpa** `JWT_SECRET`, lalu di `docker run` baru di-set env, **API** (Node) baca `JWT_SECRET` runtime → token ditandatangani secret A. **Middleware** masih pakai fallback (`NEXT_PUBLIC_JWT_SECRET` atau `arka-mms-secret`) dari waktu build → verify gagal → redirect loop.
+- **Solusi**: **Build** dengan `JWT_SECRET` sama seperti runtime, contoh Dockerfile:
+  - `ARG JWT_SECRET` + `ENV JWT_SECRET=$JWT_SECRET` sebelum `RUN npm run build`, atau
+  - `docker build --build-arg JWT_SECRET=...` (jangan commit secret di layer; prefer multi-stage atau secret mount).
+- **Debug**: `GET /api/auth/debug-auth` dengan `DEBUG_AUTH=1` — cek `verifyWithApiSecretOk`, `cookieAccessTokenPresent`, `hint`. File: `src/pages/api/auth/debug-auth.js`.
+
+---
+
 ## 2026-03-12: Docker / next start — Redirect loop login (cookie Secure di HTTP)
 
 - **Gejala**: `npm run dev` lancar; setelah `next build` + `next start` di Docker, setelah login terjadi redirect loop antara `/login` dan `/dashboards/maintenance`.
