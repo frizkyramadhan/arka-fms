@@ -4,6 +4,15 @@ Catatan penting, keputusan teknis, dan pembelajaran untuk proyek Maintenance Mon
 
 ---
 
+## 2026-03-12: Docker / next start — Redirect loop login (cookie Secure di HTTP)
+
+- **Gejala**: `npm run dev` lancar; setelah `next build` + `next start` di Docker, setelah login terjadi redirect loop antara `/login` dan `/dashboards/maintenance`.
+- **Penyebab**: Di production, `setAccessTokenCookie` menambah flag **Secure** pada cookie `accessToken`. Browser hanya mengirim cookie Secure lewat **HTTPS**. Jika app diakses via **HTTP** (port langsung, atau proxy ke container tanpa TLS ke Node), cookie tidak disimpan/dikirim → middleware (`src/middleware.js`) tidak melihat token → redirect `/login`; di client `GuestGuard` masih punya `user` → redirect lagi ke dashboard → loop.
+- **Solusi**: Set **`JWT_COOKIE_SECURE=false`** di environment container (atau `.env` production yang dipakai Docker) selama akses masih HTTP. Setelah pakai HTTPS di edge, hapus atau set `true` agar cookie hanya lewat TLS.
+- **Kode**: `src/lib/auth-api.js` — `shouldUseSecureCookie()` membaca `JWT_COOKIE_SECURE`; `false`/`0` = tanpa flag Secure. `.env.example` dokumentasi ditambah.
+
+---
+
 ## 2026-03-11: Refactor API Auth — Satu Sumber JWT + Cookie + userData
 
 - **Konteks**: `login.js` dan `me.js` menduplikasi `JWT_SECRET`, `mapUserData`, dan logika cookie; `logout.js` clear cookie tanpa `Secure` di production sehingga bisa tidak terhapus konsisten dengan saat set.
