@@ -11,6 +11,16 @@ Catatan penting, keputusan teknis, dan pembelajaran untuk proyek Maintenance Mon
 
 ---
 
+## 2026-03-12: Docker build — prisma generate gagal tanpa DATABASE_URL
+
+- **Error**: `PrismaConfigEnvError: Cannot resolve environment variable: DATABASE_URL` pada `RUN npx prisma generate`.
+- **Penyebab**: `prisma.config.ts` memakai `env('DATABASE_URL')`; config di-load saat generate meski tidak konek DB.
+- **Solusi**: Jalankan generate dengan placeholder sekali jalan:  
+  `RUN DATABASE_URL="mysql://build:build@127.0.0.1:3306/build" npx prisma generate`  
+  Runtime tetap pakai `DATABASE_URL` asli dari compose untuk `migrate deploy` + app.
+
+---
+
 ## 2026-03-12: Dockerfile + compose — JWT_SECRET saat build & DATABASE_URL mysql
 
 - **Dockerfile**: `ARG JWT_SECRET` + `ENV` sebelum `npm run build`; build gagal jika kosong. `.dockerignore` mengecualikan `.env` agar secret tidak masuk layer image — wajib `build.args` / `--build-arg`.
