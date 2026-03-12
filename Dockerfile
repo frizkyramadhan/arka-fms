@@ -15,7 +15,9 @@ RUN npm install
 
 COPY . .
 
-RUN npx prisma generate
+# prisma.config.ts → env('DATABASE_URL') wajib ada saat prisma load config.
+# Hanya untuk step ini (tidak di-ENV permanen) agar image tidak bawa URL DB build.
+RUN DATABASE_URL="mysql://build:build@127.0.0.1:3306/build" npx prisma generate
 
 # Wajib sama dengan runtime — middleware + API harus satu secret
 ARG JWT_SECRET
