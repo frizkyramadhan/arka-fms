@@ -1,0 +1,10 @@
+# Jangan bawa .env ke image — secret lewat build-arg / runtime env saja
+.env
+.env.*
+!.env.example
+
+node_modules
+.next
+.git
+*.md
+!README.md
