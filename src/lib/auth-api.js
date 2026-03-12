@@ -58,13 +58,27 @@ export function mapUserData(user, permissions = []) {
 }
 
 /**
+ * Apakah cookie accessToken harus pakai flag Secure.
+ * Di production Next selalu set Secure — tapi di Docker sering akses HTTP (atau proxy→app HTTP),
+ * sehingga browser menolak/tidak mengirim cookie → middleware redirect /login → loop dengan GuestGuard.
+ * Set JWT_COOKIE_SECURE=false di .env / docker-compose bila app diakses via HTTP.
+ * @returns {boolean}
+ */
+function shouldUseSecureCookie() {
+  const explicit = process.env.JWT_COOKIE_SECURE
+  if (explicit === 'false' || explicit === '0') return false
+  if (explicit === 'true' || explicit === '1') return true
+
+  return process.env.NODE_ENV === 'production'
+}
+
+/**
  * Set cookie HttpOnly accessToken — middleware membaca cookie ini untuk /apps dan /dashboards.
  * @param {import('next').NextApiResponse} res
  * @param {string} accessToken
  * @param {boolean} rememberMe
  */
 export function setAccessTokenCookie(res, accessToken, rememberMe) {
-  const isProd = process.env.NODE_ENV === 'production'
   const parts = [`accessToken=${accessToken}`, 'Path=/', 'HttpOnly', 'SameSite=Lax']
   if (rememberMe) {
     const days = process.env.JWT_COOKIE_MAX_AGE_DAYS
@@ -73,7 +87,7 @@ export function setAccessTokenCookie(res, accessToken, rememberMe) {
     const cookieMaxAge = (days > 0 ? days : 7) * 24 * 60 * 60
     parts.push(`Max-Age=${cookieMaxAge}`)
   }
-  if (isProd) parts.push('Secure')
+  if (shouldUseSecureCookie()) parts.push('Secure')
   res.setHeader('Set-Cookie', [parts.join('; ')])
 }
 
@@ -82,9 +96,8 @@ export function setAccessTokenCookie(res, accessToken, rememberMe) {
  * @param {import('next').NextApiResponse} res
  */
 export function clearAccessTokenCookie(res) {
-  const isProd = process.env.NODE_ENV === 'production'
   const parts = ['accessToken=', 'Path=/', 'HttpOnly', 'SameSite=Lax', 'Max-Age=0']
-  if (isProd) parts.push('Secure')
+  if (shouldUseSecureCookie()) parts.push('Secure')
   res.setHeader('Set-Cookie', [parts.join('; ')])
 }
 
