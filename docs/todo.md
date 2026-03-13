@@ -42,6 +42,10 @@ Include relevant context in brackets to help with future AI-assisted coding:
 
 - (Siap task berikutnya: MinIO attachments / Scheduler)
 
+## Recently Completed (User CRUD + permissions)
+
+- `[done] P2: Sesuaikan CRUD apps/user dengan permission user.read, user.create, user.update, user.delete — API GET/POST requirePermission; [id] GET/PATCH/DELETE per permission; list page tombol Add & aksi Edit/Delete pakai AbilityContext]` (completed: 2026-03-13)
+
 ## Recently Completed (API auth refactor)
 
 - `[done] P2: Refactor src/pages/api/auth/* — src/lib/auth-api.js (JWT, cookie, mapUserData, signAccessToken); logout clear cookie dengan Secure di prod; me parseBearer + cek decoded.id; register mapRegisteredUser + blank line ESLint]` (completed: 2026-03-11)

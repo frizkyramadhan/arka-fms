@@ -8,9 +8,12 @@ import CustomTextField from 'src/@core/components/mui/text-field'
 // ** Icon Imports
 import Icon from 'src/@core/components/icon'
 
+/**
+ * TableHeader untuk User List: search + tombol Add User.
+ * Tombol Add User hanya tampil jika user punya permission user.create (atau all.manage).
+ */
 const TableHeader = props => {
-  // ** Props
-  const { handleFilter, toggle, value } = props
+  const { handleFilter, toggle, value, canAddUser = true } = props
 
   return (
     <Box
@@ -36,10 +39,12 @@ const TableHeader = props => {
           onChange={e => handleFilter(e.target.value)}
         />
 
-        <Button onClick={toggle} variant='contained' sx={{ '& svg': { mr: 2 } }}>
-          <Icon fontSize='1.125rem' icon='tabler:plus' />
-          Add User
-        </Button>
+        {canAddUser && (
+          <Button onClick={toggle} variant='contained' sx={{ '& svg': { mr: 2 } }}>
+            <Icon fontSize='1.125rem' icon='tabler:plus' />
+            Add User
+          </Button>
+        )}
       </Box>
     </Box>
   )

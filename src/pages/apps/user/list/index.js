@@ -7,7 +7,7 @@
  */
 
 // ** React Imports
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useContext } from 'react'
 
 // ** MUI Imports
 import Box from '@mui/material/Box'
@@ -44,18 +44,22 @@ import { fetchData, deleteUser } from 'src/store/apps/user'
 import axios from 'axios'
 import toast from 'react-hot-toast'
 
+// ** ACL
+import { AbilityContext } from 'src/layouts/components/acl/Can'
+
 // ** Custom Table Components Imports
 import TableHeader from 'src/views/apps/user/list/TableHeader'
 import AddUserDrawer from 'src/views/apps/user/list/AddUserDrawer'
 import EditUserDrawer from 'src/views/apps/user/list/EditUserDrawer'
 
 // ---------------------------------------------------------------------------
-// Role & status config (untuk icon/color di tabel)
+// Role & status config (untuk icon/color di tabel). Sesuai role di seed: Administrator, Superuser, User.
+// Role lain (jika ada) pakai fallback tabler:user / primary.
 // ---------------------------------------------------------------------------
 const userRoleObj = {
-  ADMIN_HO: { icon: 'tabler:device-laptop', color: 'secondary' },
-  ADMIN_SITE: { icon: 'tabler:building-store', color: 'info' },
-  MECHANIC: { icon: 'tabler:tool', color: 'primary' }
+  Administrator: { icon: 'tabler:device-laptop', color: 'error' },
+  Superuser: { icon: 'tabler:user-star', color: 'info' },
+  User: { icon: 'tabler:user', color: 'primary' }
 }
 
 const userStatusObj = {
@@ -77,9 +81,9 @@ const renderClient = row => {
 }
 
 /**
- * Aksi per baris: Edit (buka drawer) & Delete (toast konfirmasi → dispatch deleteUser).
+ * Aksi per baris: Edit & Delete. Hanya tampil sesuai permission (user.update, user.delete).
  */
-const RowActions = ({ id, onEdit }) => {
+const RowActions = ({ id, onEdit, canEdit, canDelete }) => {
   const dispatch = useDispatch()
 
   const handleDeleteClick = () => {
@@ -112,115 +116,136 @@ const RowActions = ({ id, onEdit }) => {
     )
   }
 
+  if (!canEdit && !canDelete) return null
+
   return (
     <Box sx={{ display: 'flex', alignItems: 'center' }}>
-      <Tooltip title='Edit'>
-        <IconButton size='small' sx={{ color: 'text.secondary' }} onClick={() => onEdit(id)}>
-          <Icon icon='tabler:edit' />
-        </IconButton>
-      </Tooltip>
-      <Tooltip title='Delete'>
-        <IconButton size='small' sx={{ color: 'error.main' }} onClick={handleDeleteClick}>
-          <Icon icon='tabler:trash' />
-        </IconButton>
-      </Tooltip>
+      {canEdit && (
+        <Tooltip title='Edit'>
+          <IconButton size='small' sx={{ color: 'text.secondary' }} onClick={() => onEdit(id)}>
+            <Icon icon='tabler:edit' />
+          </IconButton>
+        </Tooltip>
+      )}
+      {canDelete && (
+        <Tooltip title='Delete'>
+          <IconButton size='small' sx={{ color: 'error.main' }} onClick={handleDeleteClick}>
+            <Icon icon='tabler:trash' />
+          </IconButton>
+        </Tooltip>
+      )}
     </Box>
   )
 }
 
-/** Definisi kolom DataGrid. onEdit = callback saat user klik Edit (buka EditUserDrawer). */
-const columns = onEdit => [
-  {
-    flex: 1,
-    minWidth: 260,
-    field: 'user',
-    headerName: 'User',
-    renderCell: ({ row }) => (
-      <Box sx={{ display: 'flex', alignItems: 'center' }}>
-        {renderClient(row)}
-        <Box sx={{ display: 'flex', flexDirection: 'column' }}>
-          <Typography variant='body2' sx={{ fontWeight: 500 }}>
-            {row.username}
-          </Typography>
-          <Typography noWrap variant='caption' sx={{ color: 'text.disabled', fontSize: '0.875rem' }}>
-            {row.name || '—'}
+/** Lebar kolom seragam (flex 1 + minWidth sama agar bagi rata). */
+const COLUMN_MIN_WIDTH = 160
+
+/** Definisi kolom DataGrid. isCurrentUserAdmin: jika false, Edit/Delete disembunyikan untuk baris user admin. */
+const buildColumns = (onEdit, canEdit, canDelete, isCurrentUserAdmin = true) => {
+  const baseColumns = [
+    {
+      flex: 1,
+      minWidth: COLUMN_MIN_WIDTH,
+      field: 'user',
+      headerName: 'User',
+      renderCell: ({ row }) => (
+        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+          {renderClient(row)}
+          <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+            <Typography variant='body2' sx={{ fontWeight: 500 }}>
+              {row.username}
+            </Typography>
+            <Typography noWrap variant='caption' sx={{ color: 'text.disabled', fontSize: '0.875rem' }}>
+              {row.name || '—'}
+            </Typography>
+          </Box>
+        </Box>
+      )
+    },
+    {
+      flex: 1,
+      minWidth: COLUMN_MIN_WIDTH,
+      field: 'email',
+      headerName: 'Email',
+      renderCell: ({ row }) => (
+        <Typography noWrap sx={{ color: 'text.secondary' }}>
+          {row.email || '—'}
+        </Typography>
+      )
+    },
+    {
+      flex: 1,
+      minWidth: COLUMN_MIN_WIDTH,
+      field: 'role',
+      headerName: 'Role',
+      renderCell: ({ row }) => (
+        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+          <CustomAvatar
+            skin='light'
+            sx={{ mr: 2, width: 30, height: 30 }}
+            color={userRoleObj[row.role]?.color || 'primary'}
+          >
+            <Icon icon={userRoleObj[row.role]?.icon || 'tabler:user'} fontSize={16} />
+          </CustomAvatar>
+          <Typography noWrap sx={{ textTransform: 'capitalize', color: 'text.secondary' }}>
+            {row.role?.replace('_', ' ')}
           </Typography>
         </Box>
-      </Box>
-    )
-  },
-  {
-    flex: 1,
-    minWidth: 180,
-    field: 'email',
-    headerName: 'Email',
-    renderCell: ({ row }) => (
-      <Typography noWrap sx={{ color: 'text.secondary' }}>
-        {row.email || '—'}
-      </Typography>
-    )
-  },
-  {
-    flex: 1,
-    minWidth: 120,
-    field: 'role',
-    headerName: 'Role',
-    renderCell: ({ row }) => (
-      <Box sx={{ display: 'flex', alignItems: 'center' }}>
-        <CustomAvatar
-          skin='light'
-          sx={{ mr: 2, width: 30, height: 30 }}
-          color={userRoleObj[row.role]?.color || 'primary'}
-        >
-          <Icon icon={userRoleObj[row.role]?.icon || 'tabler:user'} fontSize={16} />
-        </CustomAvatar>
-        <Typography noWrap sx={{ textTransform: 'capitalize', color: 'text.secondary' }}>
-          {row.role?.replace('_', ' ')}
+      )
+    },
+    {
+      flex: 1,
+      minWidth: COLUMN_MIN_WIDTH,
+      field: 'projectScope',
+      headerName: 'Project',
+      renderCell: ({ row }) => (
+        <Typography noWrap sx={{ color: 'text.secondary' }}>
+          {row.projectScope || '—'}
         </Typography>
-      </Box>
-    )
-  },
-  {
-    flex: 1,
-    minWidth: 120,
-    field: 'projectScope',
-    headerName: 'Project',
-    renderCell: ({ row }) => (
-      <Typography noWrap sx={{ color: 'text.secondary' }}>
-        {row.projectScope || '—'}
-      </Typography>
-    )
-  },
-  {
-    flex: 1,
-    minWidth: 90,
-    field: 'isActive',
-    headerName: 'Status',
-    renderCell: ({ row }) => (
-      <CustomChip
-        rounded
-        skin='light'
-        size='small'
-        label={row.isActive ? 'Active' : 'Inactive'}
-        color={userStatusObj[row.isActive ? 'active' : 'inactive']}
-      />
-    )
-  },
-  {
-    flex: 1,
-    minWidth: 200,
-    sortable: false,
-    align: 'center',
-    headerAlign: 'center',
-    field: 'actions',
-    headerName: 'Actions',
-    renderCell: ({ row }) => (
-      <Box sx={{ width: '100%', display: 'flex', justifyContent: 'center' }}>
-        <RowActions id={row.id} onEdit={onEdit} />
-      </Box>
-    )
+      )
+    },
+    {
+      flex: 1,
+      minWidth: COLUMN_MIN_WIDTH,
+      field: 'isActive',
+      headerName: 'Status',
+      renderCell: ({ row }) => (
+        <CustomChip
+          rounded
+          skin='light'
+          size='small'
+          label={row.isActive ? 'Active' : 'Inactive'}
+          color={userStatusObj[row.isActive ? 'active' : 'inactive']}
+        />
+      )
+    }
+  ]
+  if (canEdit || canDelete) {
+    baseColumns.push({
+      flex: 0.8,
+      minWidth: COLUMN_MIN_WIDTH,
+      sortable: false,
+      align: 'center',
+      headerAlign: 'center',
+      field: 'actions',
+      headerName: 'Actions',
+      renderCell: ({ row }) => {
+        // Non-admin tidak boleh edit/delete user yang rolenya administrator
+        const canEditRow = canEdit && (isCurrentUserAdmin || !row.isAdmin)
+        const canDeleteRow = canDelete && (isCurrentUserAdmin || !row.isAdmin)
+
+        return (
+          <Box sx={{ width: '100%', display: 'flex', justifyContent: 'center' }}>
+            <RowActions id={row.id} onEdit={onEdit} canEdit={canEditRow} canDelete={canDeleteRow} />
+          </Box>
+        )
+      }
+    })
   }
-]
+
+  return baseColumns
+}
 
 const UserList = () => {
   // Filter & search
@@ -239,6 +264,11 @@ const UserList = () => {
 
   const dispatch = useDispatch()
   const store = useSelector(state => state.user)
+  const ability = useContext(AbilityContext)
+  const isCurrentUserAdmin = ability?.can('manage', 'all')
+  const canCreate = ability?.can('create', 'user')
+  const canUpdate = ability?.can('update', 'user')
+  const canDelete = ability?.can('delete', 'user')
 
   // Opsi filter role dari API (nama role bisa diubah di DB)
   useEffect(() => {
@@ -321,13 +351,13 @@ const UserList = () => {
           </CardContent>
           <Divider sx={{ m: '0 !important' }} />
           {/* Search + tombol Add User */}
-          <TableHeader value={value} handleFilter={handleFilter} toggle={toggleAddUserDrawer} />
-          {/* Tabel user: data dari store.user, kolom dari columns(handleEditUser) */}
+          <TableHeader value={value} handleFilter={handleFilter} toggle={toggleAddUserDrawer} canAddUser={canCreate} />
+          {/* Tabel user: kolom aksi hanya tampil jika punya user.update atau user.delete */}
           <DataGrid
             autoHeight
             rowHeight={62}
             rows={store.data}
-            columns={columns(handleEditUser)}
+            columns={buildColumns(handleEditUser, canUpdate, canDelete, isCurrentUserAdmin)}
             disableRowSelectionOnClick
             pageSizeOptions={[10, 25, 50]}
             paginationModel={paginationModel}
