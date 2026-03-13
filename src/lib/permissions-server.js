@@ -12,6 +12,45 @@ import { buildAbilityFromPermissions, AppAbility } from 'src/lib/permissions'
 const JWT_SECRET = process.env.JWT_SECRET || process.env.NEXT_PUBLIC_JWT_SECRET || 'arka-mms-secret'
 
 /**
+ * Decode JWT dari request, return userId atau null. Tidak mengirim response (untuk dipakai setelah requireAuth/requirePermission).
+ * @param {object} req
+ * @returns {Promise<string|null>}
+ */
+export async function getUserIdFromRequest(req) {
+  const authHeader = req.headers.authorization
+  const token = authHeader && (authHeader.startsWith('Bearer ') ? authHeader.slice(7) : authHeader)
+  if (!token) {
+    return null
+  }
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET)
+
+    return decoded?.id ?? null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Daftar nama role yang punya permission tertentu (mis. all.manage = role administrator).
+ * @param {string} permissionName
+ * @returns {Promise<string[]>}
+ */
+export async function getRoleNamesWithPermission(permissionName) {
+  const perm = await prisma.permission.findUnique({ where: { name: permissionName } })
+  if (!perm) {
+    return []
+  }
+
+  const rps = await prisma.rolePermission.findMany({
+    where: { permissionId: perm.id },
+    include: { role: { select: { name: true } } }
+  })
+
+  return rps.map(rp => rp.role.name)
+}
+
+/**
  * Ambil daftar nama permission untuk user (dari user_roles -> role_permissions).
  * @param {string} userId
  * @returns {Promise<string[]>}
@@ -33,8 +72,8 @@ export async function getPermissionsForUser(userId) {
       names.add(rp.permission.name)
     }
   }
-  
-return Array.from(names)
+
+  return Array.from(names)
 }
 
 /**
@@ -51,11 +90,11 @@ export async function getAbilityForUser(userId, roleLegacy) {
   }
   if (roleLegacy) {
     const { buildAbilityFor } = await import('src/configs/acl')
-    
-return buildAbilityFor(roleLegacy, 'all')
+
+    return buildAbilityFor(roleLegacy, 'all')
   }
-  
-return new AppAbility([], {
+
+  return new AppAbility([], {
     detectSubjectType: object => (object && object.type) || object
   })
 }
@@ -69,22 +108,22 @@ export async function requireAuth(req, res) {
   const token = authHeader && (authHeader.startsWith('Bearer ') ? authHeader.slice(7) : authHeader)
   if (!token) {
     res.status(401).json({ error: 'Unauthorized' })
-    
-return true
+
+    return true
   }
   try {
     const decoded = jwt.verify(token, JWT_SECRET)
     if (!decoded?.id) {
       res.status(401).json({ error: 'Unauthorized' })
-      
-return true
+
+      return true
     }
-    
-return false
+
+    return false
   } catch {
     res.status(401).json({ error: 'Unauthorized' })
-    
-return true
+
+    return true
   }
 }
 
@@ -101,30 +140,30 @@ export async function requirePermission(req, res, requiredPermission = 'all.mana
   const token = authHeader && (authHeader.startsWith('Bearer ') ? authHeader.slice(7) : authHeader)
   if (!token) {
     res.status(401).json({ error: 'Unauthorized' })
-    
-return true
+
+    return true
   }
   try {
     const decoded = jwt.verify(token, JWT_SECRET)
     const userId = decoded?.id
     if (!userId) {
       res.status(401).json({ error: 'Unauthorized' })
-      
-return true
+
+      return true
     }
     const permissions = await getPermissionsForUser(userId)
     const allowed = permissions.includes('all.manage') || permissions.includes(requiredPermission)
     if (!allowed) {
       res.status(403).json({ error: 'Forbidden: insufficient permission' })
-      
-return true
+
+      return true
     }
-    
-return false
+
+    return false
   } catch {
     res.status(401).json({ error: 'Unauthorized' })
-    
-return true
+
+    return true
   }
 }
 
@@ -141,6 +180,6 @@ export async function getDefaultRoleIdByPermission(permissionName = 'all.manage'
     where: { permissionId: perm.id },
     select: { roleId: true }
   })
-  
-return rp?.roleId ?? null
+
+  return rp?.roleId ?? null
 }

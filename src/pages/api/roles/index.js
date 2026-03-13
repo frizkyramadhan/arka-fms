@@ -1,9 +1,10 @@
 /**
- * GET /api/roles — Daftar role (untuk dropdown Add/Edit User, dll). Semua user login boleh baca.
+ * GET /api/roles — Daftar role (untuk dropdown Add/Edit User, dll).
+ * Jika pemanggil bukan administrator (tidak punya all.manage), role administrator tidak disertakan.
  * POST /api/roles — Buat role baru. Hanya user dengan permission role.manage atau all.manage.
  */
 import prisma from 'src/lib/prisma'
-import { requireAuth, requirePermission } from 'src/lib/permissions-server'
+import { requireAuth, requirePermission, getUserIdFromRequest, getPermissionsForUser, getRoleNamesWithPermission } from 'src/lib/permissions-server'
 
 export default async function handler(req, res) {
   if (req.method === 'GET') {
@@ -22,7 +23,7 @@ export default async function handler(req, res) {
         orderBy: { name: 'asc' }
       })
 
-      const list = roles.map(r => ({
+      let list = roles.map(r => ({
         id: r.id,
         name: r.name,
         userCount: r._count.users,
@@ -30,8 +31,20 @@ export default async function handler(req, res) {
         permissionIds: r.permissions.map(p => p.permission.id),
         permissionNames: r.permissions.map(p => p.permission.name)
       }))
-      
-return res.status(200).json({ roles: list, total: list.length })
+
+      // Non-admin: sembunyikan role yang punya all.manage (administrator)
+      const userId = await getUserIdFromRequest(req)
+      if (userId) {
+        const permissions = await getPermissionsForUser(userId)
+        if (!permissions.includes('all.manage')) {
+          const adminRoleNames = await getRoleNamesWithPermission('all.manage')
+          if (adminRoleNames.length) {
+            list = list.filter(r => !adminRoleNames.includes(r.name))
+          }
+        }
+      }
+
+      return res.status(200).json({ roles: list, total: list.length })
     } catch (e) {
       console.error('GET /api/roles', e)
       
