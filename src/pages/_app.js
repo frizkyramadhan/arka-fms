@@ -67,6 +67,9 @@ import 'prismjs/components/prism-tsx'
 import 'react-perfect-scrollbar/dist/css/styles.css'
 import 'src/iconify-bundle/icons-bundle-react'
 
+// ** Font: Public Sans (self-hosted, offline) — pakai entry utama paket
+import '@fontsource-variable/public-sans'
+
 // ** Global css styles
 import '../../styles/globals.css'
 

@@ -1,5 +1,6 @@
 const typography = {
   fontFamily: [
+    '"Public Sans Variable"',
     'Public Sans',
     'sans-serif',
     '-apple-system',
